@@ -10,18 +10,17 @@
 </head>
 <body>
 
-    <!-- Canvas per le particelle di sfondo -->
+    <!-- Canvas per le particelle di sfondo (landing) -->
     <canvas id="bg-canvas"></canvas>
 
-    <div id="app">
+    <!-- ======================== LANDING PAGE ======================== -->
+    <div id="landing">
 
-        <!-- Badge "live coding" -->
         <div class="live-badge">
             <span class="live-dot"></span>
             LIVE CODING
         </div>
 
-        <!-- Titolo principale -->
         <div class="hero-title">
             <div class="title-top">AI</div>
             <div class="title-bottom">
@@ -30,13 +29,16 @@
             </div>
         </div>
 
-        <!-- Sottotitolo -->
         <p class="tagline">
             Stiamo costruendo un gioco<br>
             <strong>in tempo reale</strong> con l'intelligenza artificiale
         </p>
 
-        <!-- Grid info -->
+        <!-- Pulsante gioca -->
+        <button class="btn-gioca" onclick="iniziaGioco()">
+            🎮 GIOCA ORA
+        </button>
+
         <div class="info-grid">
             <div class="info-card">
                 <div class="info-icon">🤖</div>
@@ -55,14 +57,6 @@
             </div>
         </div>
 
-        <!-- Pulsante principale -->
-        <div class="cta-area">
-            <div class="cta-label">Il gioco arriva a breve...</div>
-            <div class="progress-bar">
-                <div class="progress-fill"></div>
-            </div>
-        </div>
-
         <!-- QR Code -->
         <div class="qr-section">
             <div class="qr-label">Scansiona per aprire sul tuo telefono</div>
@@ -72,12 +66,45 @@
             <div class="qr-url">ai-lab-videogame.vercel.app</div>
         </div>
 
-        <!-- Footer -->
         <p class="footer-text">Lezione scolastica sull'intelligenza artificiale · 2026</p>
 
     </div>
 
+    <!-- ======================== GAME CANVAS ======================== -->
+    <canvas id="game-canvas" style="display:none;"></canvas>
+
+    <!-- ======================== GAME UI (overlay) ======================== -->
+    <div id="game-ui" style="display:none;">
+        <div id="ui-top">
+            <div id="vite-display">❤️❤️❤️</div>
+            <div id="obiettivo-testo">✂️ Taglia: Europa</div>
+            <div id="ui-right">
+                <div id="timer-display">1:00</div>
+                <div id="punti-display">0</div>
+            </div>
+        </div>
+        <div id="ui-legenda">
+            <span class="legenda-item legenda-ok">✅ Giusto +10</span>
+            <span class="legenda-item legenda-veloce">⚡ Veloce +20</span>
+            <span class="legenda-item legenda-no">❌ Sbagliato -❤️</span>
+        </div>
+    </div>
+
+    <!-- ======================== GAME OVER ======================== -->
+    <div id="gameover-screen" style="display:none;">
+        <div class="gameover-box">
+            <div class="gameover-titolo">FINE ROUND</div>
+            <div class="gameover-punti-label">Punteggio</div>
+            <div id="punti-finali">0</div>
+            <div id="punti-messaggio">🌍 Bravo esploratore!</div>
+            <button class="btn-rigioca" onclick="iniziaGioco()">🔄 Rigioca</button>
+            <button class="btn-home" onclick="tornaHome()">🏠 Home</button>
+        </div>
+    </div>
+
+    <!-- Libreria QR code -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Logica di gioco -->
     <script src="game.js"></script>
     <script>
         // Genera il QR code
@@ -89,23 +116,30 @@
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.M
         });
-    </script>
-    <script>
-        // Animazione particelle di sfondo
-        const canvas = document.getElementById('bg-canvas');
-        const ctx = canvas.getContext('2d');
 
+        // Torna alla landing page
+        function tornaHome() {
+            stato.schermata = 'landing';
+            document.getElementById('gameover-screen').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'none';
+            document.getElementById('game-canvas').style.display = 'none';
+            document.getElementById('landing').style.display = 'flex';
+        }
+
+        // ---- Animazione particelle di sfondo (solo landing) ----
+        const bgCanvas = document.getElementById('bg-canvas');
+        const ctx = bgCanvas.getContext('2d');
         let particles = [];
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+        function resizeBg() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
         }
 
         function createParticle() {
             return {
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
+                x: Math.random() * bgCanvas.width,
+                y: Math.random() * bgCanvas.height,
                 vx: (Math.random() - 0.5) * 0.4,
                 vy: (Math.random() - 0.5) * 0.4,
                 size: Math.random() * 2 + 0.5,
@@ -116,62 +150,39 @@
 
         function initParticles() {
             particles = [];
-            const count = Math.floor((canvas.width * canvas.height) / 10000);
-            for (let i = 0; i < count; i++) {
-                particles.push(createParticle());
-            }
+            const count = Math.floor((bgCanvas.width * bgCanvas.height) / 10000);
+            for (let i = 0; i < count; i++) particles.push(createParticle());
         }
 
-        function drawParticles() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Disegna connessioni tra particelle vicine
+        function bgLoop() {
+            ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
             particles.forEach((p, i) => {
                 particles.slice(i + 1).forEach(q => {
-                    const dist = Math.hypot(p.x - q.x, p.y - q.y);
-                    if (dist < 120) {
+                    const d = Math.hypot(p.x - q.x, p.y - q.y);
+                    if (d < 120) {
                         ctx.beginPath();
-                        ctx.strokeStyle = `rgba(245, 197, 24, ${0.08 * (1 - dist / 120)})`;
+                        ctx.strokeStyle = `rgba(245,197,24,${0.07 * (1 - d / 120)})`;
                         ctx.lineWidth = 0.5;
                         ctx.moveTo(p.x, p.y);
                         ctx.lineTo(q.x, q.y);
                         ctx.stroke();
                     }
                 });
-            });
-
-            // Disegna particelle
-            particles.forEach(p => {
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                ctx.fillStyle = p.color.replace(')', `, ${p.alpha})`).replace('rgb', 'rgba').replace('#', '');
-                // usa fillStyle diretto
                 ctx.globalAlpha = p.alpha;
                 ctx.fillStyle = p.color;
                 ctx.fill();
                 ctx.globalAlpha = 1;
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0 || p.x > bgCanvas.width)  p.vx *= -1;
+                if (p.y < 0 || p.y > bgCanvas.height) p.vy *= -1;
             });
+            requestAnimationFrame(bgLoop);
         }
 
-        function updateParticles() {
-            particles.forEach(p => {
-                p.x += p.vx;
-                p.y += p.vy;
-                if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-                if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-            });
-        }
-
-        function loop() {
-            drawParticles();
-            updateParticles();
-            requestAnimationFrame(loop);
-        }
-
-        window.addEventListener('resize', () => { resize(); initParticles(); });
-        resize();
-        initParticles();
-        loop();
+        window.addEventListener('resize', () => { resizeBg(); initParticles(); });
+        resizeBg(); initParticles(); bgLoop();
     </script>
 </body>
 </html>
