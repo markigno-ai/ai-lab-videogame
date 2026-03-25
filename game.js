@@ -185,8 +185,8 @@ function nuovaBandiera() {
 
     // Le bandiere veloci (20%) danno doppi punti — velocità ridotta per giocabilità
     const veloce = Math.random() < 0.2;
-    const velBase = gameCanvas.height * 0.019;
-    const vy = -(velBase + Math.random() * velBase * 0.5) * (veloce ? 1.28 : 1);
+    const velBase = gameCanvas.height * 0.010;
+    const vy = -(velBase + Math.random() * velBase * 0.5) * (veloce ? 1.2 : 1);
     const vx = (Math.random() - 0.5) * 5;
 
     return {
@@ -315,7 +315,7 @@ function gameLoop(timestamp) {
     const dt = Math.min((timestamp - stato.ultimoTimestamp) / 16.67, 3);
     stato.ultimoTimestamp = timestamp;
 
-    const gravita = 0.28 * dt;
+    const gravita = 0.13 * dt;
 
     // Aggiorna fisica bandiere
     stato.flagAttive.forEach(flag => {
