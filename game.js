@@ -79,6 +79,46 @@ const CONTINENTI = Object.keys(BANDIERE);
 const DURATA_ROUND = 60;       // secondi
 const TAGLI_PER_CAMBIO = 6;    // cambia obiettivo ogni N tagli corretti
 
+// --- AUDIO (Web Audio API, nessun file esterno) ---
+let audioCtx = null;
+
+function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+}
+
+function suonoTaglio(corretto) {
+    try {
+        const ctx = getAudioCtx();
+        const gain = ctx.createGain();
+        gain.connect(ctx.destination);
+
+        if (corretto) {
+            // Sweep ascendente rapido — suono di "whoosh" positivo
+            const osc = ctx.createOscillator();
+            osc.connect(gain);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(320, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.25);
+        } else {
+            // Sweep discendente — suono di "thud" negativo
+            const osc = ctx.createOscillator();
+            osc.connect(gain);
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.35);
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.4);
+        }
+    } catch (e) { /* audio non supportato, ignora */ }
+}
+
 // --- STATO DI GIOCO ---
 let stato = {
     schermata: 'landing',
@@ -94,6 +134,8 @@ let stato = {
     tagliCorrettiObiettivo: 0,
     rafId: null,
     ultimoTimestamp: 0,
+    // Set delle emoji mostrate di recente per ogni continente (anti-ripetizione)
+    flagRecenti: {},
 };
 
 // --- CANVAS DI GIOCO ---
@@ -105,6 +147,31 @@ function ridimensionaCanvas() {
     gameCanvas.height = window.innerHeight;
 }
 
+// --- SELEZIONE BANDIERA SENZA RIPETIZIONI ---
+// Sceglie una bandiera del continente non mostrata di recente
+function scegliiBandiera(continente) {
+    const lista = BANDIERE[continente];
+    if (!stato.flagRecenti[continente]) stato.flagRecenti[continente] = new Set();
+    const recenti = stato.flagRecenti[continente];
+
+    // Candidati: bandiere non mostrate di recente
+    let candidati = lista.filter(b => !recenti.has(b.emoji));
+    // Se tutte sono recenti, svuota il set e riparti
+    if (candidati.length === 0) {
+        recenti.clear();
+        candidati = lista;
+    }
+
+    const scelta = candidati[Math.floor(Math.random() * candidati.length)];
+    recenti.add(scelta.emoji);
+    // Mantieni al massimo metà della lista nel set "recenti"
+    if (recenti.size > Math.ceil(lista.length / 2)) {
+        const prima = recenti.values().next().value;
+        recenti.delete(prima);
+    }
+    return scelta;
+}
+
 // --- CREAZIONE BANDIERA ---
 function nuovaBandiera() {
     // 50% probabilità di essere del continente obiettivo
@@ -114,13 +181,12 @@ function nuovaBandiera() {
         ? stato.obiettivoContinente
         : altriContinenti[Math.floor(Math.random() * altriContinenti.length)];
 
-    const lista = BANDIERE[continente];
-    const bandiera = lista[Math.floor(Math.random() * lista.length)];
+    const bandiera = scegliiBandiera(continente);
 
-    // Le bandiere veloci (20%) danno doppi punti
+    // Le bandiere veloci (20%) danno doppi punti — velocità ridotta per giocabilità
     const veloce = Math.random() < 0.2;
     const velBase = gameCanvas.height * 0.019;
-    const vy = -(velBase + Math.random() * velBase * 0.5) * (veloce ? 1.7 : 1);
+    const vy = -(velBase + Math.random() * velBase * 0.5) * (veloce ? 1.28 : 1);
     const vx = (Math.random() - 0.5) * 5;
 
     return {
@@ -132,8 +198,8 @@ function nuovaBandiera() {
         y: gameCanvas.height + 60,
         vx,
         vy,
-        raggio: veloce ? 28 : 34,
-        dimensione: veloce ? 52 : 64,
+        raggio: veloce ? 36 : 42,
+        dimensione: veloce ? 66 : 80,
         veloce,
         tagliata: false,
     };
@@ -177,10 +243,12 @@ function tagliaFlag(flag) {
         const pt = flag.veloce ? 20 : 10;
         stato.punti += pt;
         stato.tagliCorrettiObiettivo++;
+        suonoTaglio(true);
         creaEffettoTesto(flag.x, flag.y, `+${pt}`, '#00ff88', flag.nome);
         if (stato.tagliCorrettiObiettivo >= TAGLI_PER_CAMBIO) cambiaObiettivo();
     } else {
         stato.vite--;
+        suonoTaglio(false);
         creaEffettoTesto(flag.x, flag.y, '-1 ❤️', '#ff4444', flag.nome);
         aggiornaVite();
         if (stato.vite <= 0) setTimeout(fineGioco, 400);
@@ -386,6 +454,7 @@ function iniziaGioco() {
     stato.effetti = [];
     stato.trailPoints = [];
     stato.tagliCorrettiObiettivo = 0;
+    stato.flagRecenti = {};
     stato.obiettivoContinente = CONTINENTI[Math.floor(Math.random() * CONTINENTI.length)];
 
     document.getElementById('landing').style.display = 'none';
