@@ -63,12 +63,33 @@
             </div>
         </div>
 
+        <!-- QR Code -->
+        <div class="qr-section">
+            <div class="qr-label">Scansiona per aprire sul tuo telefono</div>
+            <div class="qr-wrapper">
+                <div id="qrcode"></div>
+            </div>
+            <div class="qr-url">ai-lab-videogame.vercel.app</div>
+        </div>
+
         <!-- Footer -->
         <p class="footer-text">Lezione scolastica sull'intelligenza artificiale · 2026</p>
 
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="game.js"></script>
+    <script>
+        // Genera il QR code
+        new QRCode(document.getElementById('qrcode'), {
+            text: 'https://ai-lab-videogame.vercel.app/',
+            width: 160,
+            height: 160,
+            colorDark: '#0d0d1a',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    </script>
     <script>
         // Animazione particelle di sfondo
         const canvas = document.getElementById('bg-canvas');
